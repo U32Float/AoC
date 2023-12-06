@@ -1,4 +1,5 @@
 import sys
+import math
 
 file = sys.argv[1] if len(sys.argv) > 1 else "ex1"
 lines = list(map(lambda l: l.rstrip(), open(file + ".txt").readlines()))
@@ -31,13 +32,29 @@ print("Part 1: " + str(part1))
 # ----------------------------------------------------------------------
 # * Part 2
 
+
+def discriminant(t, d):
+    return t**2 - 4 * d
+
+
+def roots(t, d):
+    d = discriminant(t, d)
+    s = math.sqrt(abs(d))
+    if d == 0:
+        return [t / 2]
+    else:
+        return [(-t + s)/-2, (-t - s)/-2]
+
+
 race = [int(line[9:].replace(' ', '')) for line in lines]
+[lower, upper] = roots(race[0], race[1])
 
-total = 0
-t = race[0]
-for v in range(t):
-    if distance(t, v) > race[1]:
-        total += 1
+lower_bound = math.floor(lower)
+if math.ceil(lower) > race[1]:
+    lower_bound = math.ceil(lower)
 
-part2 = total
-print("Part 2: " + str(part2))
+upper_bound = math.floor(upper)
+if math.ceil(upper) > race[1]:
+    upper_bound = math.ceil(upper)
+
+print("Part 2: " + str(upper_bound - lower_bound))
