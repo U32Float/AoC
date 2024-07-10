@@ -197,16 +197,16 @@ fn part2(input: &str) -> usize {
     let grid = Grid::parse(input);
     let graph = Graph::new(&grid);
 
-    let mut steps: HashMap<Pos, (Vec<Pos>, usize)> = HashMap::new();
+    let mut steps: HashMap<Pos, usize> = HashMap::new();
     let mut stack = vec![(graph.start, 0, vec![graph.start])];
 
     while let Some((q, s, vs)) = stack.pop() {
         if steps.contains_key(&q) {
-            if s > steps[&q].1 {
-                steps.insert(q, (vs.clone(), s));
+            if s > steps[&q] {
+                steps.insert(q, s);
             }
         } else {
-            steps.insert(q, (vs.clone(), s));
+            steps.insert(q, s);
         }
 
         for (dst, dist) in &graph.nodes[&q] {
@@ -224,7 +224,7 @@ fn part2(input: &str) -> usize {
         }
     }
 
-    steps[&graph.end].1
+    steps[&graph.end]
 }
 
 fn main() {
