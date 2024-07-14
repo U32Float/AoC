@@ -1,139 +1,128 @@
-#![allow(dead_code)]
+use std::collections::HashMap;
+use Mode::*;
 
-use std::{
-    collections::{HashMap, VecDeque},
-    i128,
-};
-
-use tap::TapOptional;
-
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Mode {
-    Immediate,
-    Position,
-    Relative(u128),
+    Position(i128),
+    Immediate(i128),
+    Relative(i128),
 }
 
-impl Mode {
-    fn get(self, value: i128, code: &HashMap<u128, i128>) -> i128 {
-        match self {
-            Mode::Immediate => value,
-            Mode::Position => *code.get(&(value as u128)).unwrap_or(&0),
-            Mode::Relative(base) => code[&((base as i128 + value) as u128)],
-        }
-    }
+struct Computer {
+    heap: HashMap<i128, i128>,
+    pc: i128,
+    rb: i128,
 }
 
-struct Amplifier {
-    pc: u128,
-    base: u128,
-    stack: VecDeque<i128>,
-    code: HashMap<u128, i128>,
-}
-
-impl Amplifier {
-    fn new(code: Vec<i128>) -> Self {
-        let mut map = HashMap::new();
-        for (i, c) in code.into_iter().enumerate() {
-            map.insert(i as u128, c);
-        }
+impl Computer {
+    fn parse(input: &str) -> Self {
         Self {
+            heap: input
+                .trim()
+                .split(',')
+                .map(|s| s.parse().unwrap())
+                .enumerate()
+                .map(|(i, s)| (i as i128, s))
+                .collect::<HashMap<_, _>>(),
             pc: 0,
-            base: 0,
-            stack: VecDeque::new(),
-            code: map,
+            rb: 0,
         }
     }
 
-    fn apply(&mut self, input: Option<i128>) -> Option<i128> {
-        input.tap_some(|i| self.stack.push_back(*i));
+    fn execute(self, input: &[i128]) -> Vec<i128> {
+        let mut output = vec![];
+
+        let mut input = input.to_vec();
+        input.reverse();
+
+        let Self {
+            mut heap,
+            mut pc,
+            mut rb,
+        } = self;
+
+        macro_rules! heap {
+            ($p: expr) => {
+                match $p {
+                    Position(i) => *heap.get(&i).unwrap_or(&0),
+                    Immediate(i) => i,
+                    Relative(i) => *heap.get(&(i + rb)).unwrap_or(&0),
+                }
+            };
+        }
+        macro_rules! heap_mut {
+            ($p: expr) => {
+                match $p {
+                    Position(i) => heap.entry(i).or_insert(0),
+                    Relative(i) => heap.entry(i + rb).or_insert(0),
+                    Immediate(_) => panic!(),
+                }
+            };
+        }
 
         loop {
-            let code = &mut self.code;
-            let pc = &mut self.pc;
-            let opcode: i128 = code[pc];
-
-            println!("{:?}", opcode);
+            let opcode = heap[&pc];
 
             if opcode == 99 {
-                return None;
+                return output;
             }
 
-            let mut modes = [Mode::Position; 3];
-            for i in 0..3i128 {
-                let m = ((opcode - (opcode % 10i128.pow(2 + i as u32))) / 10i128.pow(2 + i as u32))
-                    % 10;
-                modes[i as usize] = match m {
-                    0 => Mode::Position,
-                    1 => Mode::Immediate,
-                    2 => Mode::Relative(self.base),
+            let mut ps = [Mode::Position(0); 3];
+            for i in 0..3 {
+                let v = heap![Position(pc + i as i128 + 1)];
+                ps[i] = match ((opcode - (opcode % 10i128.pow(2 + i as u32)))
+                    / 10i128.pow(2 + i as u32))
+                    % 10
+                {
+                    0 => Position(v),
+                    1 => Immediate(v),
+                    2 => Relative(v),
                     _ => panic!(),
                 }
             }
 
             match opcode % 10 {
                 1 => {
-                    #[rustfmt::skip] let x = modes[0].get(code[&(*pc + 1)], &code);
-                    #[rustfmt::skip] let y = modes[1].get(code[&(*pc + 2)], &code);
-                    #[rustfmt::skip] let addr = modes[2].get(code[&(*pc + 3)], &code);
-                    code.insert(addr as u128, x + y);
-                    *pc += 4
+                    *heap_mut![ps[2]] = heap![ps[0]] + heap![ps[1]];
+                    pc += 4;
                 }
                 2 => {
-                    #[rustfmt::skip] let x = modes[0].get(code[&(*pc + 1)], &code);
-                    #[rustfmt::skip] let y = modes[1].get(code[&(*pc + 2)], &code);
-                    #[rustfmt::skip] let addr = modes[2].get(code[&(*pc + 3)], &code);
-                    code.insert(addr as u128, x * y);
-                    *pc += 4
+                    *heap_mut![ps[2]] = heap![ps[0]] * heap![ps[1]];
+                    pc += 4;
                 }
                 3 => {
-                    #[rustfmt::skip] let addr = modes[0].get(code[&(*pc + 1)], &code);
-                    let val = self.stack.pop_front().unwrap();
-                    code.insert(addr as u128, val);
-                    *pc += 2
+                    *heap_mut![ps[0]] = input.pop().unwrap();
+                    pc += 2
                 }
                 4 => {
-                    #[rustfmt::skip] let addr = modes[0].get(code[&(*pc + 1)], &code);
-                    let ret = Some(*code.get(&(addr as u128)).unwrap_or(&0));
-                    *pc += 2;
-                    return ret;
+                    output.push(heap![ps[0]]);
+                    pc += 2
                 }
                 5 => {
-                    #[rustfmt::skip] let x = modes[0].get(code[&(*pc + 1)], &code);
-                    #[rustfmt::skip] let y = modes[1].get(code[&(*pc + 2)], &code);
-                    if x != 0 {
-                        *pc = y as u128;
+                    if heap![ps[0]] != 0 {
+                        pc = heap![ps[1]];
                     } else {
-                        *pc += 3;
+                        pc += 3;
                     }
                 }
                 6 => {
-                    #[rustfmt::skip] let x = modes[0].get(code[&(*pc + 1)], &code);
-                    #[rustfmt::skip] let y = modes[1].get(code[&(*pc + 2)], &code);
-                    if x == 0 {
-                        *pc = y as u128;
+                    if heap![ps[0]] == 0 {
+                        pc = heap![ps[1]];
                     } else {
-                        *pc += 3;
+                        pc += 3;
                     }
                 }
                 7 => {
-                    #[rustfmt::skip] let x = modes[0].get(code[&(*pc + 1)], &code);
-                    #[rustfmt::skip] let y = modes[1].get(code[&(*pc + 2)], &code);
-                    #[rustfmt::skip] let addr = code[&(*pc + 3)];
-                    code.insert(addr as u128, (x < y) as i128);
-                    *pc += 4;
+                    *heap_mut![ps[2]] = (heap![ps[0]] < heap![ps[1]]) as i128;
+                    pc += 4;
                 }
                 8 => {
-                    #[rustfmt::skip] let x = modes[0].get(code[&(*pc + 1)], &code);
-                    #[rustfmt::skip] let y = modes[1].get(code[&(*pc + 2)], &code);
-                    #[rustfmt::skip] let addr = code[&(*pc + 3)];
-                    code.insert(addr as u128, (x == y) as i128);
-                    *pc += 4;
+                    *heap_mut![ps[2]] = (heap![ps[0]] == heap![ps[1]]) as i128;
+                    pc += 4;
                 }
                 9 => {
-                    #[rustfmt::skip] let x = code[&(*pc + 1)];
-                    self.base = (self.base as i128 + x) as u128;
-                    *pc += 2;
+                    rb += heap![ps[0]];
+                    pc += 2;
                 }
                 _ => panic!("Incorrect opcode"),
             }
@@ -141,28 +130,33 @@ impl Amplifier {
     }
 }
 
+fn solve(input: &str, instr: i128) -> usize {
+    let computer = Computer::parse(input);
+    computer.execute(&[instr]).pop().unwrap() as usize
+}
+
+fn part1(input: &str) -> usize {
+    solve(input, 1)
+}
+
+fn part2(input: &str) -> usize {
+    solve(input, 2)
+}
+
 fn main() {
-    #[cfg(debug_assertions)]
-    let input = include_str!("../ex1.txt");
-    #[cfg(debug_assertions)]
-    let id = None;
-    #[cfg(not(debug_assertions))]
     let input = include_str!("../in.txt");
-    #[cfg(not(debug_assertions))]
-    let id = Some(1);
+    println!("Part 1: {}", part1(input));
+    println!("Part 2: {}", part2(input));
+}
 
-    let code = input
-        .split(",")
-        .flat_map(|s| s.trim().parse::<i128>())
-        .collect();
+#[test]
+fn example1() {
+    let input = include_str!("../ex1.txt");
+    assert_eq!(part1(input), 1125899906842624);
+}
 
-    let mut amplifier = Amplifier::new(code);
-
-    let prev = id;
-    let mut output = 0;
-    while let Some(out) = amplifier.apply(prev) {
-        println!("{:?}", out);
-        output = out;
-    }
-    println!("Part 1: {:?}", output);
+#[test]
+fn example2() {
+    let input = include_str!("../ex2.txt");
+    assert_eq!(part1(input), 99);
 }
