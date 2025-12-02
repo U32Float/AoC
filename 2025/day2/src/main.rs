@@ -57,9 +57,6 @@ fn part2(input: &str) -> usize {
         let mut invalid_ids = HashSet::new();
         for rep in 2..=range.end().ilog10() + 1 {
             let partial_range = find_partial_range(range.clone(), rep as usize);
-            if partial_range.end() < partial_range.start() {
-                continue;
-            }
             for x in partial_range {
                 let y = (0..rep)
                     .map(|i| x * 10usize.pow(i * (x.ilog10() + 1)))
