@@ -24,6 +24,16 @@ fn find_partial_range(range: RangeInclusive<usize>, rep: usize) -> RangeInclusiv
     partial_start..=partial_end
 }
 
+fn parse(input: &str) -> impl Iterator<Item = RangeInclusive<usize>> {
+    input.split(",").map(|s| {
+        let range = s
+            .split("-")
+            .map(|x| x.parse::<usize>().unwrap())
+            .collect_vec();
+        range[0]..=range[1]
+    })
+}
+
 fn part1(input: &str) -> usize {
     fn invalid_ids(range: RangeInclusive<usize>) -> usize {
         let partial_range = find_partial_range(range.clone(), 2);
@@ -39,17 +49,7 @@ fn part1(input: &str) -> usize {
         total
     }
 
-    input
-        .split(",")
-        .map(|s| {
-            let range = s
-                .split("-")
-                .map(|x| x.parse::<usize>().unwrap())
-                .collect_vec();
-            range[0]..=range[1]
-        })
-        .map(invalid_ids)
-        .sum()
+    parse(input).map(invalid_ids).sum()
 }
 
 fn part2(input: &str) -> usize {
@@ -72,17 +72,7 @@ fn part2(input: &str) -> usize {
         invalid_ids.iter().sum()
     }
 
-    input
-        .split(",")
-        .map(|s| {
-            let range = s
-                .split("-")
-                .map(|x| x.parse::<usize>().unwrap())
-                .collect_vec();
-            range[0]..=range[1]
-        })
-        .map(invalid_ids)
-        .sum()
+    parse(input).map(invalid_ids).sum()
 }
 
 fn main() {
