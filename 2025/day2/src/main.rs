@@ -48,7 +48,7 @@ fn part1(input: &str) -> usize {
                 .collect_vec();
             range[0]..=range[1]
         })
-        .map(|range| invalid_ids(range))
+        .map(invalid_ids)
         .sum()
 }
 
@@ -81,7 +81,7 @@ fn part2(input: &str) -> usize {
                 .collect_vec();
             range[0]..=range[1]
         })
-        .map(|range| invalid_ids(range))
+        .map(invalid_ids)
         .sum()
 }
 
