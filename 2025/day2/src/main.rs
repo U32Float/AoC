@@ -62,7 +62,6 @@ fn part2(input: &str) -> usize {
             }
             for x in partial_range {
                 let y = (0..rep)
-                    .rev()
                     .map(|i| x * 10usize.pow(i * (x.ilog10() + 1)))
                     .sum::<usize>();
                 if range.contains(&y) {
