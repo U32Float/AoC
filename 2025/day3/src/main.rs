@@ -1,5 +1,3 @@
-#![feature(slice_as_array)]
-
 use itertools::Itertools;
 
 fn parse(input: &str) -> impl Iterator<Item = Vec<usize>> {
